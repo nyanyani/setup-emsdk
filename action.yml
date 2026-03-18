@@ -12,10 +12,10 @@ inputs:
     description: "If true will not cache any downloads with tc.cacheDir."
     default: false
   actions-cache-folder:
-    description: "Directory to cache emsdk in. This folder will go under $GITHUB_HOME (I.e. build dir) and be cached using @actions/cache."
+    description: "Directory to reuse/store emsdk in the workspace. Cache this folder externally with actions/cache if desired."
     default: ''
   cache-key:
-    description: "Override the cache key. By default, it is `{Github workflow name}-{Emscripten version}-{OS type}-${CPU architecture}`."
+    description: "Deprecated. Cache keys must be managed by your workflow cache step."
     default: ''
   update:
     description: "Fetch package information for all the new tools and SDK versions"
@@ -24,7 +24,7 @@ inputs:
     description: "Deprecated in favor of `update`."
     default: false
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
 branding:
   icon: 'download'

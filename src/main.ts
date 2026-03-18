@@ -1,12 +1,23 @@
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 import * as tc from '@actions/tool-cache';
-import * as cache from '@actions/cache';
 import * as io from '@actions/io';
-import * as os from 'os';
-import * as fs from 'fs';
-import * as path from 'path';
-import { envRegex, pathRegex } from './matchers'
+import * as os from 'node:os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { envRegex, pathRegex } from './matchers.js'
+
+function getManagedEmsdkFolder(folder: string) {
+  return path.join(folder, 'emsdk-main')
+}
+
+function hasManagedEmsdk(folder: string) {
+  const emsdkScript = os.platform() === 'win32'
+    ? path.join(getManagedEmsdkFolder(folder), 'emsdk.ps1')
+    : path.join(getManagedEmsdkFolder(folder), 'emsdk')
+
+  return fs.existsSync(emsdkScript)
+}
 
 async function run() {
   try {
@@ -20,48 +31,59 @@ async function run() {
       update: await core.getInput("update") || await core.getInput("update-tags")
     };
 
-    let emsdkFolder;
+    let emsdkFolder: string | undefined;
     let foundInCache = false;
+    const workspaceFolder = process.env.GITHUB_WORKSPACE;
+    const managedFolder = emArgs.actionsCacheFolder && workspaceFolder
+      ? path.join(workspaceFolder, emArgs.actionsCacheFolder)
+      : null;
 
     if (emArgs.version !== "latest" && emArgs.version !== "tot" && emArgs.noCache === "false" && !emArgs.actionsCacheFolder) {
       emsdkFolder = await tc.find('emsdk', emArgs.version, os.arch());
     }
 
-    const cacheKey = emArgs.cacheKey || `${process.env.GITHUB_WORKFLOW}-${emArgs.version}-${os.platform()}-${os.arch()}`;
-    if (emArgs.actionsCacheFolder && process.env.GITHUB_WORKSPACE) {
-      const fullCachePath = path.join(process.env.GITHUB_WORKSPACE, emArgs.actionsCacheFolder);
-      try {
-        try {
-         fs.accessSync(path.join(fullCachePath, 'emsdk-main', 'emsdk'), fs.constants.X_OK);
-        } catch {
-          await cache.restoreCache([emArgs.actionsCacheFolder], cacheKey);
-        }
-        fs.accessSync(path.join(fullCachePath, 'emsdk-main', 'emsdk'), fs.constants.X_OK);
-        emsdkFolder = fullCachePath;
+    if (emArgs.cacheKey) {
+      core.warning('cache-key is deprecated and ignored. Manage cache keys in your workflow cache step instead.');
+    }
+
+    if (managedFolder) {
+      if (hasManagedEmsdk(managedFolder)) {
+        emsdkFolder = managedFolder;
         foundInCache = true;
-      } catch {
-        core.warning(`No cached files found at path "${fullCachePath}" - downloading and caching emsdk.`);
-        await io.rmRF(fullCachePath);
-        // core.debug(fs.readdirSync(fullCachePath + '/emsdk-main').toString());
+      } else {
+        core.warning(`No emsdk installation found at path "${managedFolder}". Downloading a fresh copy; cache this folder externally if you want reuse across runs.`);
+        await io.rmRF(managedFolder);
       }
     }
 
     if (!emsdkFolder) {
       const emsdkArchive = await tc.downloadTool("https://github.com/emscripten-core/emsdk/archive/main.zip");
       emsdkFolder = await tc.extractZip(emsdkArchive);
-    } else {
+    } else if (!foundInCache) {
       foundInCache = true;
     }
 
-    let emsdk = path.join(emsdkFolder, 'emsdk-main', 'emsdk');
+    if (!emsdkFolder) {
+      throw new Error('Failed to determine the emsdk folder')
+    }
+
+    let emsdkRoot = getManagedEmsdkFolder(emsdkFolder)
+    let emsdk = path.join(emsdkRoot, 'emsdk');
 
     if (os.platform() === "win32") {
-      emsdk = `powershell ${path.join(emsdkFolder, 'emsdk-main', 'emsdk.ps1')}`;
+      emsdk = `powershell ${path.join(emsdkRoot, 'emsdk.ps1')}`;
     }
 
     if (emArgs.noInstall === "true") {
-      core.addPath(path.join(emsdkFolder, 'emsdk-main'));
-      core.exportVariable("EMSDK", path.join(emsdkFolder, 'emsdk-main'));
+      if (managedFolder && !foundInCache) {
+        fs.mkdirSync(managedFolder, { recursive: true });
+        await io.cp(emsdkRoot, getManagedEmsdkFolder(managedFolder), { recursive: true })
+        emsdkFolder = managedFolder
+        emsdkRoot = getManagedEmsdkFolder(managedFolder)
+      }
+
+      core.addPath(emsdkRoot);
+      core.exportVariable("EMSDK", emsdkRoot);
       return;
     }
 
@@ -75,10 +97,20 @@ async function run() {
       if (emArgs.version !== "latest" && emArgs.version !== "tot" && emArgs.noCache === "false" && !emArgs.actionsCacheFolder) {
         await tc.cacheDir(emsdkFolder, 'emsdk', emArgs.version, os.arch());
       }
+
+      if (managedFolder) {
+        fs.mkdirSync(managedFolder, { recursive: true });
+        await io.cp(emsdkRoot, getManagedEmsdkFolder(managedFolder), { recursive: true })
+        emsdkFolder = managedFolder
+        emsdkRoot = getManagedEmsdkFolder(managedFolder)
+        emsdk = os.platform() === "win32"
+          ? `powershell ${path.join(emsdkRoot, 'emsdk.ps1')}`
+          : path.join(emsdkRoot, 'emsdk')
+      }
     }
 
     await exec.exec(`${emsdk} activate ${emArgs.version}`);
-    const envListener = (message) => {
+    const envListener = (message: string) => {
       const pathResult = pathRegex.exec(message);
 
       if (pathResult) {
@@ -94,12 +126,6 @@ async function run() {
       }
     };
     await exec.exec(`${emsdk} construct_env`, [], {listeners: {stdline: envListener, errline: envListener}})
-
-    if (emArgs.actionsCacheFolder && !foundInCache && process.env.GITHUB_WORKSPACE) {
-      fs.mkdirSync(path.join(process.env.GITHUB_WORKSPACE, emArgs.actionsCacheFolder), { recursive: true });
-      await io.cp(path.join(emsdkFolder, 'emsdk-main'), path.join(process.env.GITHUB_WORKSPACE, emArgs.actionsCacheFolder), { recursive: true })
-      await cache.saveCache([emArgs.actionsCacheFolder], cacheKey);
-    }
   } catch (error) {
     if (error &&
       typeof error === "object" &&
