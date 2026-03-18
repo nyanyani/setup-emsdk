@@ -3,6 +3,9 @@
 >
 >This repository shall be archived in the future once the upstream action comes back to maintenance and when mymindstorm/setup-emsdk#48 is merged.
 
+> [!IMPORTANT]
+> This fork is patched to avoid action-managed cache internals. If you want to persist the `actions-cache-folder` directory across workflow runs, cache that directory explicitly in your workflow with `actions/cache@v5`.
+
 # setup-emsdk
 
 This actions step downloads emsdk and installs a version of Emscripten.
@@ -53,10 +56,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
       - name: Setup cache
         id: cache-system-libraries
-        uses: actions/cache@v2
+        uses: actions/cache@v5
         with:
           path: ${{env.EM_CACHE_FOLDER}}
           key: ${{env.EM_VERSION}}-${{ runner.os }}
@@ -83,7 +86,7 @@ no-cache:
   description: "If true will not cache any downloads with tc.cacheDir."
   default: false
 actions-cache-folder:
-  description: "Directory to cache emsdk in. This folder will go under $GITHUB_HOME (I.e. build dir) and be cached using @actions/cache."
+  description: "Directory to reuse/store emsdk in the workspace. Cache this folder externally with actions/cache if desired."
   default: ''
 update:
   description: "Fetch package information for all the new tools and SDK versions"
