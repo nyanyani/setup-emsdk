@@ -1,7 +1,14 @@
-import test, { ExecutionContext } from 'ava';
+import test from 'ava';
+import type { ExecutionContext } from 'ava';
 import { promises as fs } from 'fs';
 import { resolve } from 'path';
-import { pathRegex, envRegex } from '../src/matchers';
+import { fileURLToPath } from 'url';
+import { pathRegex, envRegex } from '../src/matchers.js';
+
+const dirname = fileURLToPath(new URL('.', import.meta.url));
+const testRoot = dirname.includes(`${resolve('.ava')}\\test\\`) || dirname.includes(`${resolve('.ava')}/test/`)
+  ? resolve(process.cwd(), 'test')
+  : dirname;
 
 const powershellLogPath = 'fixtures/construct_env/powershell.log';
 const ubuntuBashLogPath = 'fixtures/construct_env/ubuntu-bash.log';
@@ -12,7 +19,7 @@ function trimTimestamp(line: string) {
 }
 
 async function matchLog(t: ExecutionContext, matcher: RegExp, filename: string) {
-  const path = resolve(__dirname, filename);
+  const path = resolve(testRoot, filename);
   const log = await fs.readFile(path, 'utf-8');
   const results: Array<any> = [];
   for (const line of log.split('\n').map(trimTimestamp)) {

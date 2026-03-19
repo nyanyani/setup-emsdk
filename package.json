@@ -1,13 +1,14 @@
 {
   "name": "setup-emsdk",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
   "description": "Github action to download and setup Emscripten",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && ncc build lib/main.js --license licenses.txt -m --target es2022",
-    "test": "ava"
+    "test:compile": "tsc -p tsconfig.ava.json",
+    "test": "pnpm run test:compile && ava"
   },
   "repository": {
     "type": "git",
@@ -27,18 +28,18 @@
     "@actions/tool-cache": "^4.0.0"
   },
   "devDependencies": {
+    "@ava/typescript": "^6.0.0",
     "@types/node": "^25.5.0",
     "@vercel/ncc": "^0.38.4",
     "ava": "^7.0.0",
-    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "ava": {
-    "extensions": [
-      "ts"
-    ],
-    "require": [
-      "ts-node/register"
-    ]
+    "typescript": {
+      "compile": false,
+      "rewritePaths": {
+        "test/": ".ava/test/"
+      }
+    }
   }
 }

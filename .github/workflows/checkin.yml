@@ -9,19 +9,30 @@ jobs:
       with:
         persist-credentials: false
 
-    - name: "npm ci"
-      run: npm ci
+    - name: "Setup pnpm"
+      uses: pnpm/action-setup@v5
+      with:
+        version: 10
 
-    - name: "npm run build"
-      run: npm run build
+    - name: "Setup Node.js"
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24
+        cache: pnpm
+
+    - name: "pnpm install"
+      run: pnpm install --frozen-lockfile
+
+    - name: "pnpm build"
+      run: pnpm build
 
     - name: "check for uncommitted changes"
       # Ensure no changes, but ignore node_modules dir since dev/fresh ci deps installed.
       run: |
         git diff --exit-code --stat -- . ':!node_modules' \
-        || (echo "##[error] found changed files after build. please 'npm run build && npm run format'" \
-                 "and check in all changes" \
-            && exit 1)
+         || (echo "##[error] found changed files after build. please 'pnpm build'" \
+                  "and check in all changes" \
+             && exit 1)
 
-    - name: "npm test"
-      run: npm test
+    - name: "pnpm test"
+      run: pnpm test
