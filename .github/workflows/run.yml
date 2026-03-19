@@ -14,7 +14,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
-    - uses: pyodide/setup-emsdk@main
+    - uses: nyanyani/setup-emsdk@main
 
     - name: Verify
       run: emcc -v
@@ -22,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup emsdk (use cache if found, create otherwise)
-        uses: pyodide/setup-emsdk@main
+        uses: nyanyani/setup-emsdk@main
         with:
-          version: 4.0.9
+          version: 5.0.2
           actions-cache-folder: 'emsdk-cache-folder'
           no-cache: true
 
@@ -33,7 +33,7 @@ jobs:
   no-install:
     runs-on: ubuntu-latest
     steps:
-      - uses: pyodide/setup-emsdk@main
+      - uses: nyanyani/setup-emsdk@main
         with:
           no-install: true
 
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup emsdk (use cache if found, create otherwise)
-        uses: pyodide/setup-emsdk@main
+        uses: nyanyani/setup-emsdk@main
         with:
           version: tot
           no-cache: true
