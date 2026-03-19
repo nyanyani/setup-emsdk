@@ -1,12 +1,12 @@
 {
   "name": "setup-emsdk",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
   "description": "Github action to download and setup Emscripten",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && ncc build lib/main.js --license licenses.txt -m --target es2022",
+    "build": "node scripts/build.mjs",
     "test:compile": "tsc -p tsconfig.ava.json",
     "test": "pnpm run test:compile && ava"
   },
